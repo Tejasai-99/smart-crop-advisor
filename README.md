@@ -104,3 +104,153 @@ N, P, K, pH             |              Temperature
                         |
                         v
                  Top 5 Recommendations
+
+
+Technology Stack
+Frontend
+React
+Vite
+JavaScript
+CSS
+Backend
+Python
+FastAPI
+Uvicorn
+Machine Learning
+Scikit-learn
+Random Forest
+Pandas
+Joblib
+OCR and Document Processing
+Tesseract OCR
+Pytesseract
+Pillow
+PyMuPDF
+External APIs
+Open-Meteo Geocoding API
+Open-Meteo Weather API
+Development and Deployment
+Git
+GitHub
+Vercel
+Render
+Project Structure
+smart-crop-advisor/
+|
+├── frontend/
+|   ├── src/
+|   |   ├── App.jsx
+|   |   ├── App.css
+|   |   └── index.css
+|   ├── package.json
+|   └── vite.config.js
+|
+├── Crop_recommendation.csv
+├── crop_model.pkl
+├── main.py
+├── predict.py
+├── requirements.txt
+├── season.py
+├── soil_reader.py
+├── train.py
+├── weather.py
+├── .gitignore
+└── README.md
+API Endpoints
+Health Check
+GET /health
+
+Returns the health status of the backend service.
+
+Weather
+GET /weather?state={state}&village={village}
+
+Returns location information, seven-day weather data, and agricultural weather alerts.
+
+Soil Report
+POST /soil-report
+
+Accepts a soil report and extracts soil parameters using OCR.
+
+Crop Recommendation
+POST /recommend
+
+Accepts a soil report, state, village, and season and returns soil information, weather information, and crop recommendations.
+
+Local Installation
+Clone the Repository
+git clone https://github.com/Tejasai-99/smart-crop-advisor.git
+cd smart-crop-advisor
+Backend Setup
+
+Install the Python dependencies:
+
+pip install -r requirements.txt
+
+Start the FastAPI server:
+
+python -m uvicorn main:app --reload
+
+The backend will be available at:
+
+http://127.0.0.1:8000
+
+FastAPI documentation:
+
+http://127.0.0.1:8000/docs
+Frontend Setup
+
+Open a new terminal:
+
+cd frontend
+npm install
+npm run dev
+
+The frontend will be available at:
+
+http://localhost:5173
+Prediction Workflow
+1. Farmer uploads soil report
+2. OCR extracts N, P, K, and pH
+3. Farmer selects state, village, and season
+4. Location is identified using the geocoding service
+5. Weather information is retrieved
+6. Seven ML features are prepared
+7. Random Forest generates crop probabilities
+8. Season suitability is applied to the predictions
+9. Top five crop recommendations are returned
+10. Results are displayed in the React application
+Future Improvements
+Improve village matching for locations with duplicate names.
+Expand and improve the agricultural training dataset.
+Add additional soil parameters.
+Improve weather-based agricultural recommendations.
+Incorporate historical weather information.
+Evaluate the model using external datasets.
+Add farmer authentication and personalized profiles.
+Improve model validation and monitoring.
+Deploy the application for public use.
+Project Objective
+
+The objective of Smart Crop Advisor is to provide farmers with an accessible decision-support platform that combines soil information, environmental conditions, weather forecasts, and seasonal considerations to assist with crop selection.
+
+The system is intended as a decision-support tool and not as a replacement for professional agricultural advice.
+
+Author
+
+Nalamati Teja Sai
+
+GitHub: https://github.com/Tejasai-99
+
+License
+
+This project is intended for educational and development purposes.
+
+
+### After pasting
+
+Click **Commit changes** on GitHub.
+
+Then your repository README will be much more professional and useful for recruiters.
+
+After that, **we'll deploy the FastAPI backend on Render**.
