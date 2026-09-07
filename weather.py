@@ -16,34 +16,48 @@ def get_location(village, state):
         "format": "json"
     }
 
-    response = requests.get(url, params=params)
+    try:
+        response = requests.get(url, params=params, timeout=15)
 
-    if response.status_code != 200:
-        print("❌ Location API error")
+        print("📍 Location API status:", response.status_code)
+
+        if response.status_code != 200:
+            print("❌ Location API response:", response.text)
+            return None
+
+        data = response.json()
+
+        if "results" not in data:
+            print("❌ Location not found")
+            return None
+
+        # Try to find matching state
+        for place in data["results"]:
+
+            admin1 = place.get("admin1", "")
+
+            if state.lower() in admin1.lower():
+
+                location = {
+                    "name": place["name"],
+                    "state": admin1,
+                    "latitude": place["latitude"],
+                    "longitude": place["longitude"]
+                }
+
+                print("📍 Location found:", location)
+
+                return location
+
+        print("❌ No matching location found for state:", state)
+
         return None
 
-    data = response.json()
+    except Exception as e:
 
-    if "results" not in data:
-        print("❌ Location not found")
+        print("❌ Location API exception:", str(e))
+
         return None
-
-    # Try to find matching state
-    for place in data["results"]:
-
-        admin1 = place.get("admin1", "")
-
-        if state.lower() in admin1.lower():
-
-            return {
-                "name": place["name"],
-                "state": admin1,
-                "latitude": place["latitude"],
-                "longitude": place["longitude"]
-            }
-
-    # No exact state match
-    return None
 
 
 # ============================================
@@ -74,13 +88,49 @@ def get_forecast(latitude, longitude):
         "timezone": "auto"
     }
 
-    response = requests.get(url, params=params)
+    try:
 
-    if response.status_code != 200:
-        print("❌ Weather API error")
+        response = requests.get(
+            url,
+            params=params,
+            timeout=15
+        )
+
+        # Print status for debugging
+        print("🌦️ Weather API status:", response.status_code)
+
+        # If API returns an error
+        if response.status_code != 200:
+
+            print("❌ Weather API response:")
+            print(response.text)
+
+            return None
+
+        # Convert response to JSON
+        data = response.json()
+
+        print("✅ Weather data received successfully")
+
+        return data
+
+    except requests.exceptions.Timeout:
+
+        print("❌ Weather API timeout")
+
         return None
 
-    return response.json()
+    except requests.exceptions.RequestException as e:
+
+        print("❌ Weather API request error:", str(e))
+
+        return None
+
+    except Exception as e:
+
+        print("❌ Weather API exception:", str(e))
+
+        return None
 
 
 # ============================================
@@ -130,8 +180,12 @@ def analyze_weather(
 
     alerts = []
 
+    # ========================================
     # Heavy rain
+    # ========================================
+
     if rainfall >= 50:
+
         alerts.append(
             "🌧️ HEAVY RAIN ALERT: "
             "Heavy rainfall is expected. "
@@ -139,14 +193,19 @@ def analyze_weather(
         )
 
     elif rainfall >= 20:
+
         alerts.append(
             "🌧️ RAIN ALERT: "
             "Significant rainfall is expected. "
             "Monitor your fields for waterlogging."
         )
 
+    # ========================================
     # Extreme heat
+    # ========================================
+
     if max_temp >= 40:
+
         alerts.append(
             "🔥 EXTREME HEAT ALERT: "
             "Very high temperature is expected. "
@@ -154,14 +213,19 @@ def analyze_weather(
         )
 
     elif max_temp >= 35:
+
         alerts.append(
             "🌡️ HIGH TEMPERATURE: "
             "High temperature is expected. "
             "Monitor crops for heat stress."
         )
 
+    # ========================================
     # Strong wind
+    # ========================================
+
     if wind_speed >= 50:
+
         alerts.append(
             "💨 STRONG WIND ALERT: "
             "Strong winds are expected. "
@@ -169,14 +233,19 @@ def analyze_weather(
         )
 
     elif wind_speed >= 35:
+
         alerts.append(
             "💨 WIND WARNING: "
             "Strong winds may occur. "
             "Take necessary precautions."
         )
 
+    # ========================================
     # Thunderstorm
+    # ========================================
+
     if weather_code in [95, 96, 99]:
+
         alerts.append(
             "⛈️ THUNDERSTORM ALERT: "
             "Thunderstorms are expected. "
@@ -189,4 +258,3 @@ def analyze_weather(
 # ============================================
 # Main program
 # ============================================
-
