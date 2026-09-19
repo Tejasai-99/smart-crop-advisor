@@ -43,6 +43,7 @@ Model Performance
 Note: This is test-set performance and does not represent real-world agricultural accuracy. Field validation would be required.
 
 🏗️ Architecture
+```text
 Crop Recommendation
 React
   ↓
@@ -59,6 +60,9 @@ Random Forest
 Season-Based Ranking
   ↓
 Top 5 Crops
+```
+
+```text
 Weather & Alerts
 React
   ↓
@@ -67,7 +71,13 @@ Open-Meteo
 7-Day Forecast
   ↓
 Weather Alerts
+
+```
+
+
 🛠️ Tech Stack
+
+```text
 Frontend
 React
 JavaScript
@@ -92,10 +102,13 @@ Vercel
 Render
 Docker
 GitHub
+```
 
 
 
 📁 Project Structure
+
+```text
 smart-crop-advisor/
 │
 ├── frontend/
@@ -108,6 +121,8 @@ smart-crop-advisor/
 ├── requirements.txt
 ├── Dockerfile
 └── README.md
+```
+
 ⚙️ Run Locally
 Backend
 
