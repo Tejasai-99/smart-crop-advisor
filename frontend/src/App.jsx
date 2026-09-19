@@ -1,5 +1,6 @@
 import { useState } from "react";
 import "./App.css";
+
 const API_URL = import.meta.env.VITE_API_URL;
 
 function App() {
@@ -498,7 +499,7 @@ function App() {
       }
 
       if (alert.includes("THUNDERSTORM ALERT")) {
-        return "⛈️ आंधी-तूफान चेतावनी: गरज के साथ बारिश होने की संभावना है। आवश्यक सुरक्षा सावधानी बरतें।";
+        return "⛈️ आंधी-तूफान चेतावनी: गरज के साथ बारिश होने की संभावना है। आवश्यक सुरक्षा सावधानी बरतें.";
       }
     }
 
@@ -525,35 +526,227 @@ function App() {
       return;
     }
 
-    const formData = new FormData();
-
-    formData.append("file", file);
-    formData.append("state", state);
-    formData.append("village", village);
-    formData.append("season", season);
-
     try {
       setLoading(true);
 
-      const response = await fetch(
-        `${API_URL}/recommend`,
-        {
-          method: "POST",
-          body: formData
-        }
-      );
+      // ==========================================
+      // 1. EXTRACT SOIL VALUES USING OCR
+      // ==========================================
 
-      const data = await response.json();
+      const soilFormData = new FormData();
+      soilFormData.append("file", file);
 
-      if (!response.ok || !data.success) {
-        setError(data.message || t.somethingWrong);
-        return;
+      const soilResponse = await fetch(`${API_URL}/soil-report`, {
+        method: "POST",
+        body: soilFormData,
+      });
+
+      if (!soilResponse.ok) {
+        throw new Error("Soil report processing failed");
       }
 
-      setResult(data);
+      const soilData = await soilResponse.json();
 
+      if (!soilData.success || !soilData.soil) {
+        throw new Error(
+          soilData.message || "Unable to extract soil values"
+        );
+      }
+
+      const soil = soilData.soil;
+
+      if (
+        soil.nitrogen == null ||
+        soil.phosphorus == null ||
+        soil.potassium == null ||
+        soil.ph == null
+      ) {
+        throw new Error(
+          "Could not extract all required soil values from the report."
+        );
+      }
+
+      // ==========================================
+      // 2. FIND LOCATION USING OPEN-METEO
+      // ==========================================
+
+      const locationUrl =
+        `https://geocoding-api.open-meteo.com/v1/search` +
+        `?name=${encodeURIComponent(village)}` +
+        `&count=10` +
+        `&language=en` +
+        `&format=json`;
+
+      const locationResponse = await fetch(locationUrl);
+
+      if (!locationResponse.ok) {
+        throw new Error("Location API failed");
+      }
+
+      const locationData = await locationResponse.json();
+
+      if (!locationData.results || locationData.results.length === 0) {
+        throw new Error("Location not found.");
+      }
+
+      let location = locationData.results.find((place) =>
+        (place.admin1 || "")
+          .toLowerCase()
+          .includes(state.toLowerCase())
+      );
+
+      if (!location) {
+        location = locationData.results[0];
+      }
+
+      // ==========================================
+      // 3. GET CURRENT WEATHER USING OPEN-METEO
+      // ==========================================
+
+      const weatherUrl =
+        `https://api.open-meteo.com/v1/forecast` +
+        `?latitude=${location.latitude}` +
+        `&longitude=${location.longitude}` +
+        `&current=temperature_2m,relative_humidity_2m` +
+        `&daily=precipitation_sum,wind_speed_10m_max` +
+        `&forecast_days=1` +
+        `&timezone=auto`;
+
+      const weatherResponse = await fetch(weatherUrl);
+
+      if (!weatherResponse.ok) {
+        throw new Error("Weather API failed");
+      }
+
+      const weatherData = await weatherResponse.json();
+
+      if (!weatherData.current || !weatherData.daily) {
+        throw new Error("Invalid weather data");
+      }
+
+      const temperature = weatherData.current.temperature_2m;
+      const humidity = weatherData.current.relative_humidity_2m;
+      const rainfall = weatherData.daily.precipitation_sum[0];
+      const windSpeed = weatherData.daily.wind_speed_10m_max[0];
+
+      // ==========================================
+      // 4. SEND 7 FEATURES TO ML MODEL
+      // ==========================================
+
+      const params = new URLSearchParams({
+        N: String(soil.nitrogen),
+        P: String(soil.phosphorus),
+        K: String(soil.potassium),
+        ph: String(soil.ph),
+        temperature: String(temperature),
+        humidity: String(humidity),
+        rainfall: String(rainfall),
+      });
+
+      const predictionResponse = await fetch(
+        `${API_URL}/recommend-crop?${params.toString()}`
+      );
+
+      if (!predictionResponse.ok) {
+        throw new Error("Crop prediction failed");
+      }
+
+      const predictionData = await predictionResponse.json();
+
+      if (!predictionData.success || !predictionData.recommendations) {
+        throw new Error(
+          predictionData.message || "Unable to predict crops"
+        );
+      }
+
+      // ==========================================
+      // 5. APPLY SEASON RANKING
+      // ==========================================
+
+      const seasonCrops = {
+        Kharif: [
+          "rice",
+          "maize",
+          "pigeonpeas",
+          "mothbeans",
+          "mungbean",
+          "blackgram",
+          "cotton",
+          "jute",
+          "banana",
+          "papaya",
+          "coconut",
+        ],
+        Rabi: [
+          "wheat",
+          "chickpea",
+          "kidneybeans",
+          "lentil",
+          "pigeonpeas",
+          "grapes",
+          "pomegranate",
+          "orange",
+        ],
+        Zaid: [
+          "watermelon",
+          "muskmelon",
+          "maize",
+          "mungbean",
+          "mothbeans",
+          "papaya",
+        ],
+      };
+
+      const suitableCrops = seasonCrops[season] || [];
+
+      const rankedRecommendations = predictionData.recommendations
+        .map((item) => {
+          const isSuitable = suitableCrops.includes(
+            String(item.crop).toLowerCase()
+          );
+
+          return {
+            ...item,
+            adjustedScore: isSuitable
+              ? item.probability * 1.5
+              : item.probability * 0.2,
+          };
+        })
+        .sort((a, b) => b.adjustedScore - a.adjustedScore)
+        .slice(0, 5)
+        .map((item) => ({
+          crop: item.crop,
+          probability: item.probability,
+        }));
+
+      // ==========================================
+      // 6. DISPLAY FINAL RESULT
+      // ==========================================
+
+      setResult({
+        success: true,
+        soil: {
+          nitrogen: soil.nitrogen,
+          phosphorus: soil.phosphorus,
+          potassium: soil.potassium,
+          ph: soil.ph,
+        },
+        weather: {
+          temperature,
+          humidity,
+          rainfall,
+          wind_speed: windSpeed,
+        },
+        location: {
+          name: location.name,
+          state: location.admin1 || state,
+        },
+        season,
+        recommendations: rankedRecommendations,
+      });
     } catch (err) {
-      setError(t.serverError);
+      console.error("Crop recommendation error:", err);
+      setError(err.message || t.somethingWrong);
     } finally {
       setLoading(false);
     }
@@ -561,6 +754,7 @@ function App() {
 
   // ==========================================
   // WEATHER
+  // DIRECT OPEN-METEO FROM REACT
   // ==========================================
 
   const handleWeather = async (e) => {
@@ -577,26 +771,211 @@ function App() {
     try {
       setWeatherLoading(true);
 
-      const url =
-        `${API_URL}/weather` +
-        `?state=${encodeURIComponent(weatherState)}` +
-        `&village=${encodeURIComponent(weatherVillage)}`;
+      // ==========================================
+      // 1. LOCATION SEARCH
+      // ==========================================
 
-      const response = await fetch(url);
+      const locationUrl =
+        `https://geocoding-api.open-meteo.com/v1/search` +
+        `?name=${encodeURIComponent(weatherVillage)}` +
+        `&count=10` +
+        `&language=en` +
+        `&format=json`;
 
-      const data = await response.json();
+      const locationResponse = await fetch(locationUrl);
 
-      if (!response.ok || !data.success) {
-        setWeatherError(
-          data.message || t.weatherUnavailable
-        );
+      if (!locationResponse.ok) {
+        throw new Error("Location API failed");
+      }
+
+      const locationData = await locationResponse.json();
+
+      if (!locationData.results || locationData.results.length === 0) {
+        setWeatherError("Location not found.");
         return;
       }
 
-      setWeatherResult(data);
+      // Try to find matching state
+      let location = locationData.results.find((place) =>
+        (place.admin1 || "")
+          .toLowerCase()
+          .includes(weatherState.toLowerCase())
+      );
 
+      // If no exact state match is found,
+      // use the first result as fallback.
+      if (!location) {
+        location = locationData.results[0];
+      }
+
+      // ==========================================
+      // 2. WEATHER FORECAST
+      // ==========================================
+
+      const weatherUrl =
+        `https://api.open-meteo.com/v1/forecast` +
+        `?latitude=${location.latitude}` +
+        `&longitude=${location.longitude}` +
+        `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max` +
+        `&forecast_days=7` +
+        `&timezone=auto`;
+
+      const weatherResponse = await fetch(weatherUrl);
+
+      if (!weatherResponse.ok) {
+        throw new Error("Weather API failed");
+      }
+
+      const weatherData = await weatherResponse.json();
+
+      if (!weatherData.daily) {
+        throw new Error("Invalid weather data");
+      }
+
+      // ==========================================
+      // WEATHER DESCRIPTION
+      // ==========================================
+
+      const getWeatherDescription = (code) => {
+        if (code === 0) return "Clear sky";
+
+        if ([1, 2, 3].includes(code)) {
+          return "Partly cloudy / Cloudy";
+        }
+
+        if ([45, 48].includes(code)) {
+          return "Fog";
+        }
+
+        if ([51, 53, 55, 56, 57].includes(code)) {
+          return "Drizzle";
+        }
+
+        if ([61, 63, 65, 66, 67].includes(code)) {
+          return "Rain";
+        }
+
+        if ([71, 73, 75, 77].includes(code)) {
+          return "Snow";
+        }
+
+        if ([80, 81, 82].includes(code)) {
+          return "Rain showers";
+        }
+
+        if ([95, 96, 99].includes(code)) {
+          return "Thunderstorm";
+        }
+
+        return "Unknown";
+      };
+
+      // ==========================================
+      // WEATHER ALERTS
+      // ==========================================
+
+      const analyzeWeather = (
+        maxTemp,
+        rainfall,
+        windSpeed,
+        weatherCode
+      ) => {
+        const alerts = [];
+
+        if (rainfall >= 50) {
+          alerts.push(
+            "🌧️ HEAVY RAIN ALERT: Heavy rainfall is expected. Check field drainage and protect harvested crops."
+          );
+        } else if (rainfall >= 20) {
+          alerts.push(
+            "🌧️ RAIN ALERT: Significant rainfall is expected. Monitor your fields for waterlogging."
+          );
+        }
+
+        if (maxTemp >= 40) {
+          alerts.push(
+            "🔥 EXTREME HEAT ALERT: Very high temperature is expected. Take appropriate precautions for crops and livestock."
+          );
+        } else if (maxTemp >= 35) {
+          alerts.push(
+            "🌡️ HIGH TEMPERATURE: High temperature is expected. Monitor crops for heat stress."
+          );
+        }
+
+        if (windSpeed >= 50) {
+          alerts.push(
+            "💨 STRONG WIND ALERT: Strong winds are expected. Secure vulnerable farm structures."
+          );
+        } else if (windSpeed >= 35) {
+          alerts.push(
+            "💨 WIND WARNING: Strong winds may occur. Take necessary precautions."
+          );
+        }
+
+        if ([95, 96, 99].includes(weatherCode)) {
+          alerts.push(
+            "⛈️ THUNDERSTORM ALERT: Thunderstorms are expected. Take necessary safety precautions."
+          );
+        }
+
+        return alerts;
+      };
+
+      // ==========================================
+      // BUILD FORECAST
+      // ==========================================
+
+      const forecast = weatherData.daily.time.map((date, index) => {
+        const maxTemp =
+          weatherData.daily.temperature_2m_max[index];
+
+        const minTemp =
+          weatherData.daily.temperature_2m_min[index];
+
+        const rainfall =
+          weatherData.daily.precipitation_sum[index];
+
+        const windSpeed =
+          weatherData.daily.wind_speed_10m_max[index];
+
+        const weatherCode =
+          weatherData.daily.weather_code[index];
+
+        return {
+          date,
+          min_temperature: minTemp,
+          max_temperature: maxTemp,
+          rainfall,
+          wind_speed: windSpeed,
+          weather_code: weatherCode,
+          description: getWeatherDescription(weatherCode),
+          alerts: analyzeWeather(
+            maxTemp,
+            rainfall,
+            windSpeed,
+            weatherCode
+          )
+        };
+      });
+
+      // ==========================================
+      // SAVE WEATHER RESULT
+      // ==========================================
+
+      setWeatherResult({
+        success: true,
+
+        location: {
+          name: location.name,
+          state: location.admin1 || weatherState
+        },
+
+        forecast
+      });
     } catch (err) {
-      setWeatherError(t.serverError);
+      console.error("Weather error:", err);
+
+      setWeatherError(t.weatherUnavailable);
     } finally {
       setWeatherLoading(false);
     }
@@ -710,7 +1089,6 @@ function App() {
           <p className="section-description">
             {t.cropDescription}
           </p>
-
 
           <form
             className="recommendation-form"
@@ -1134,6 +1512,13 @@ function App() {
                       💨 {t.windSpeed}:{" "}
                       <strong>
                         {day.wind_speed} km/h
+                      </strong>
+                    </p>
+
+                    <p>
+                      🌤️{" "}
+                      <strong>
+                        {day.description}
                       </strong>
                     </p>
 
