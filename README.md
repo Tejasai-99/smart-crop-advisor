@@ -1,31 +1,32 @@
-# Smart Crop Advisor
+# 🌱 Smart Crop Advisor
 
 Smart Crop Advisor is a full-stack agricultural decision-support application that uses **Soil OCR, Machine Learning, Weather Data, and Season-based rules** to recommend suitable crops.
 
-##  Live Demo
+## 🚀 Live Demo
 
 🌐 https://smart-crop-advisor-iota.vercel.app/
 
-##  Features
+## ✨ Features
 
--  Upload soil reports in PDF, JPG, JPEG, or PNG format
--  Extract N, P, K and pH automatically using OCR
--  Get local weather information
--  Predict suitable crops using Machine Learning
--  Season-aware crop ranking for Kharif, Rabi and Zaid
--  Display Top 5 crop recommendations
--  7-day weather forecast and general weather alerts
--  English, Telugu and Hindi interface
+- 📄 Upload soil reports in PDF, JPG, JPEG, or PNG format
+- 🔍 Extract N, P, K and pH automatically using OCR
+- 🌦️ Get local weather information
+- 🤖 Predict suitable crops using Machine Learning
+- 📅 Season-aware crop ranking for Kharif, Rabi and Zaid
+- 🌾 Display Top 5 crop recommendations
+- ⚠️ 7-day weather forecast and general weather alerts
+- 🌐 English, Telugu and Hindi interface
 
-##  Machine Learning
+## 🧠 Machine Learning
 
 The project uses a **Random Forest Classifier** trained on:
 
-- 2,200 samples
-- 7 features
+- **2,200 samples**
+- **7 features**
 
 ### Input Features
 
+```text
 N
 P
 K
@@ -34,12 +35,14 @@ Humidity
 pH
 Rainfall
 Model Performance
+```
+
 
 99.55% test-set accuracy
 
 Note: This is test-set performance and does not represent real-world agricultural accuracy. Field validation would be required.
 
- Architecture
+🏗️ Architecture
 Crop Recommendation
 React
   ↓
@@ -65,38 +68,26 @@ Open-Meteo
   ↓
 Weather Alerts
 🛠️ Tech Stack
-
 Frontend
-
 React
 JavaScript
 CSS
-
 Backend
-
 Python
 FastAPI
 Uvicorn
-
 Machine Learning
-
 Scikit-learn
 Random Forest
 Pandas
 Joblib
-
 OCR & Documents
-
 Tesseract OCR
 PyMuPDF
 Pillow
-
 Weather
-
 Open-Meteo
-
 Deployment
-
 Vercel
 Render
 Docker
@@ -119,6 +110,9 @@ smart-crop-advisor/
 └── README.md
 ⚙️ Run Locally
 Backend
+
+Create a virtual environment:
+
 python -m venv venv
 
 Windows:
@@ -136,7 +130,11 @@ python -m uvicorn main:app --reload
 Backend:
 
 http://127.0.0.1:8000
+
 Frontend
+
+Open another terminal:
+
 cd frontend
 npm install
 npm run dev
@@ -144,6 +142,7 @@ npm run dev
 Frontend:
 
 http://localhost:5173
+
 📌 Project Highlights
 Full-stack React + FastAPI application
 OCR-based automatic soil parameter extraction
@@ -161,6 +160,3 @@ B.Tech Information Technology
 Pragati Engineering College
 
 🔗 GitHub: https://github.com/Tejasai-99
-
-
-This version is **much better for your GitHub repository** because recruiters can understand the project in about **1–2 minutes** without reading a huge document.
